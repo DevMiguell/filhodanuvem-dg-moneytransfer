@@ -1,0 +1,44 @@
+version: "3.9"
+services:
+  app:
+    image: cosmtrek/air:v1.28.0
+    working_dir: /app
+    ports:
+      - 3005:3005
+    environment:
+      API_PORT: 3005
+      DATABASE_URL: postgres://moneytransfer:p0stgr3s@db:5432/moneytransfer
+    volumes:
+      - ./:/app/
+    depends_on:
+      - db
+  db:
+    image: postgres:14.3
+    environment:
+      POSTGRES_PASSWORD: p0stgr3s
+      POSTGRES_USER: moneytransfer
+    volumes:
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - 5432:5432
+  
+  unittest:
+    image: golang:1.19.0-alpine3.16
+    volumes:
+      - ./:/app
+    working_dir: /app
+    environment: 
+      CGO_ENABLED: 0
+    command: go test -v ./...
+
+  loadtest:
+    image: loadimpact/k6:latest
+    ports:
+      - "6565:6565"
+    environment:
+      - API_URL=http://app:3005
+    volumes:
+      - ./tests:/tests
+    command: run --duration 10s --vus 80 /tests/load.js
+    depends_on:
+      - app
